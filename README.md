@@ -83,6 +83,13 @@ ft train       # GPT chico sobre tokens; checkpoint en artifacts/transformer
 ft eval-gpt    # one-step + calibracion + closed-loop -> reports/transformer.md
 ```
 
+Stage 0 direccional (sin GPU): ¿hay skill a 1h/4h/12h antes de invertir en un
+modelo de secuencia?
+
+```bash
+ft direction   # logistic + HistGradientBoosting + backtest neto -> reports/direction_12h.md
+```
+
 Todo se configura en `configs/tokenizer.yaml`; las rutas son relativas al
 directorio desde donde se ejecuta `ft`.
 
@@ -217,6 +224,37 @@ direccional y subrepresenta las colas. El unigram preserva mejor la cola (Hill
 3.04) pero dispara la kurtosis (41.6). El siguiente paso no es una arquitectura
 más grande: es ampliar el universo de símbolos y probar decodificación/loss
 tail-aware. Detalle completo en `reports/transformer.md`.
+
+## Stage 0 direccional
+
+Objetivo: decidir si hay skill direccional en ventanas de hasta 12h **antes** de
+gastar GPU. No es un modelo de secuencia; es un screening barato con features
+causales y clasificadores tabulares.
+
+- Targets: signo del retorno forward a 1h, 4h y 12h (4, 16 y 48 velas de 15m).
+- Features: ~50 features causales (momentum multi-horizonte normalizado por ATR,
+  tendencia/SMA, RSI/MACD/Bollinger, rango/drawdown, volatilidad, volumen,
+  calendario).
+- Splits: BTC/ETH train 2017-2023, val 2024; test 2025-2026 con SOL como
+  holdout. Muestreo no solapado y purga de `h` barras en las fronteras.
+- Modelos: logistic L2 y HistGradientBoosting; selección por AUC en validación.
+- Backtest: long/short en futuros, 10 bps round trip, sin funding (Stage 0).
+  Se reportan también 0/2/4/5/20 bps para ver el break-even.
+- Ventanas de alta direccionalidad: se elige en validación el top-q% de
+  `|P(subida)-0.5|` y se aplica a test; no se elige el decil mirando test.
+
+Resultado (detalle en `reports/direction_12h.md`):
+
+- **12h: sin evidencia**, ni bruta ni neta. El AUC test es ~0.505 y el Sharpe
+  bruto a 0 bps es negativo.
+- **4h: candidato cost-sensitive**. El top-10% de confianza tiene Sharpe neto
+  val 0.39 y test 0.51 a 10 bps, Sharpe bruto test 1.66, retorno neto +45% y
+  57.4% de accuracy. Está traccionado por ETH; BTC aporta negativo.
+- **1h: señal bruta** (Sharpe bruto test ~1.3) pero validación neta negativa y
+  costos/turnover la eliminan.
+- Conclusión: no entrenar un transformer direccional todavía. El candidato 4h
+  necesita walk-forward por año, per-símbolo, funding y ejecución maker antes
+  de justificar GPU.
 
 ## Tests
 

@@ -10,6 +10,8 @@ from pathlib import Path
 from .config import load_config
 from .data.binance import download
 from .data.synth import synthesize
+from .direction.config import load_direction_config
+from .direction.pipeline import run_direction
 from .eval.report import build_report
 from .eval.sweep import run_sweep
 from .model.config import load_transformer_config
@@ -76,6 +78,10 @@ def cmd_train(args) -> None:
 
 def cmd_eval_gpt(args) -> None:
     evaluate_transformer(load_transformer_config(args.config))
+
+
+def cmd_direction(args) -> None:
+    run_direction(load_direction_config(args.config))
 
 
 def cmd_all(args) -> None:
@@ -162,6 +168,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("eval-gpt", parents=[common], help="evaluacion one-step, calibracion y closed-loop")
     p.set_defaults(func=cmd_eval_gpt, config="configs/transformer.yaml")
+
+    p = sub.add_parser("direction", parents=[common], help="Stage 0: skill direccional a 1h/4h/12h")
+    p.set_defaults(func=cmd_direction, config="configs/direction.yaml")
 
     p = sub.add_parser("demo", parents=[common], help="pipeline completo con datos sinteticos")
     p.add_argument("--years", type=float, default=3.0)

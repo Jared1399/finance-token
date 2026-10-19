@@ -1,0 +1,31 @@
+tokenizer_config: configs/tokenizer.yaml
+
+# Horizontes en barras de 15m: 4=1h, 16=4h, 48=12h.
+horizons: [4, 16, 48]
+
+# Zona muerta: |retorno forward| <= deadband_frac * sigma_h se excluye
+# del subconjunto de alta direccionalidad (diagnostico, no del training).
+# 1.0 sigma deja ~1/3 de los movimientos mas grandes.
+deadband_frac: 1.0
+
+train_symbols: [BTCUSDT, ETHUSDT]
+eval_symbols: [BTCUSDT, ETHUSDT, SOLUSDT]
+
+models:
+  logistic_C: [0.01, 0.1, 1.0]
+  hgb:
+    learning_rate: [0.03, 0.1]
+    max_leaf_nodes: [7, 15]
+    min_samples_leaf: [100, 200]
+    l2_regularization: 1.0
+    max_iter: 300
+
+backtest:
+  # Futuros: taker ~4 bps/lado + slippage. 10 bps round trip es conservador.
+  round_trip_bps: 10.0
+  thresholds: [0.0, 0.02, 0.05, 0.10]
+  min_trades: 100
+
+paths:
+  reports: reports
+  artifacts: artifacts/direction
