@@ -338,6 +338,47 @@ Resultado:
 - Conclusión: el régimen no agrega una regla explotable; no justifica GPU.
   Detalle en `reports/regime_experiment.md`.
 
+## Triples Barreras con Monte Carlo autoregresivo
+
+```bash
+ft triple-barrier --config configs/triple_barrier.yaml
+# piloto representativo (167 puntos por símbolo y año, M=500):
+ft triple-barrier --paths 500 --points-per-symbol-year 167
+```
+
+Para cada punto del test se toman 256 velas de contexto y se generan `M=500`
+trayectorias de 48 velas (12h) con el Transformer en closed-loop. En cada vela
+se recomputan ATR de Wilder, State (SMA/σ de 100) y Scale (log ATR / mediana
+30d). Las barreras son `+1.5 ATR` (TP long) y `-1.0 ATR` (SL long); para short,
+`-1.5 ATR` (TP) y `+1.0 ATR` (SL). Si una vela toca ambas, se resuelve con la
+morfología (alcista: low antes que high; bajista: high antes que low; doji: la
+más cercana al open).
+
+El target real es 1 si el TP Long se toca primero, 0 si SL Long o timeout. Se
+reportan Rank IC de Spearman, ECE y deciles de `P_hat(Long)`, y Top 10% long /
+short con hit rate real de TP y EV neto (TP +1.5 ATR, SL -1.0 ATR, timeout al
+cierre, menos 10 bps). **No se predicen signos individuales de velas.**
+
+El grid completo con stride=16 son ~10.935 puntos. El run completo con M=500
+cuesta ~12-16 h en la GTX 1060; por eso el reporte usa un piloto aleatorio
+estratificado por símbolo y año: 1.002 puntos (167 por símbolo/año).
+
+Resultados del piloto:
+
+- Rank IC BTC/ETH: -0.0301 (2025 -0.0498, 2026 -0.0115). SOL: +0.0707
+  (2025 +0.0906, 2026 +0.0406). Ningún IC es significativo; el mejor (SOL
+  2025) tiene t≈1.17.
+- ECE: 0.0399 BTC/ETH y 0.0173 SOL, pero `P_hat` medio queda ~3 pp debajo de
+  la tasa base y los deciles no son monótonos. Calibración global sin
+  discriminación.
+- Top 10% long BTC/ETH: hit 0.388 vs base 0.424, EV -13.2 bps; short: hit
+  0.373, EV -5.8 bps. SOL long: hit 0.500, EV -0.3 bps (el costo anula el
+  bruto); short: 0.382, EV -5.2 bps. Sin cola robusta.
+- **Veredicto**: las trayectorias no capturan path dependency útil para
+  triples barreras; no hay base para un modelo direccional o GPU adicional.
+  Detalle en `reports/triple_barrier_eval.md` y
+  `reports/triple_barrier_metrics.json`.
+
 ## Tests
 
 ```bash

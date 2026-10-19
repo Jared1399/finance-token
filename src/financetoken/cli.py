@@ -18,6 +18,7 @@ from .direction.flow_experiment import run_flow_experiment
 from .direction.pipeline import run_direction
 from .direction.regime_config import load_regime_config
 from .direction.regime_experiment import run_regime_experiment
+from .eval.monte_carlo_barriers import load_barrier_config, run_triple_barrier_eval
 from .eval.report import build_report
 from .eval.sweep import run_sweep
 from .model.config import load_transformer_config
@@ -100,6 +101,18 @@ def cmd_exhaustion(args) -> None:
 
 def cmd_regime(args) -> None:
     run_regime_experiment(load_regime_config(args.config))
+
+
+def cmd_triple_barrier(args) -> None:
+    cfg = load_barrier_config(args.config)
+    if args.paths is not None:
+        cfg.n_paths = int(args.paths)
+        cfg.batch_paths = min(cfg.batch_paths, cfg.n_paths)
+    if args.points_per_symbol_year is not None:
+        cfg.points_per_symbol_year = int(args.points_per_symbol_year)
+    if args.stride is not None:
+        cfg.stride = int(args.stride)
+    run_triple_barrier_eval(cfg)
 
 
 def cmd_all(args) -> None:
@@ -198,6 +211,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("regime-4h", parents=[common], help="4h gating por regimen: compresion vs expansion")
     p.set_defaults(func=cmd_regime, config="configs/regime_4h.yaml")
+
+    p = sub.add_parser("triple-barrier", parents=[common], help="Monte Carlo closed-loop de triples barreras")
+    p.add_argument("--paths", type=int, default=None, help="trayectorias por punto (default: config)")
+    p.add_argument("--points-per-symbol-year", type=int, default=None, help="piloto: puntos por simbolo y anio")
+    p.add_argument("--stride", type=int, default=None, help="stride en velas (default: config)")
+    p.set_defaults(func=cmd_triple_barrier, config="configs/triple_barrier.yaml")
 
     p = sub.add_parser("demo", parents=[common], help="pipeline completo con datos sinteticos")
     p.add_argument("--years", type=float, default=3.0)

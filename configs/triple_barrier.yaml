@@ -1,0 +1,20 @@
+transformer_config: configs/transformer.yaml
+
+eval:
+  horizon_bars: 48          # 12h a 15m
+  stride: 16                # ~4h
+  n_paths: 500              # Monte Carlo por punto
+  batch_paths: 500
+  tp_atr: 1.5
+  sl_atr: 1.0
+  cost_bps: 10.0
+  temperature: 1.0
+  top_p: 0.95
+  seed: 7
+  # null = grid completo (~10.9k puntos). Para piloto, p.ej. 48 puntos por
+  # simbolo y anio (288 puntos en total).
+  points_per_symbol_year: null
+
+paths:
+  reports: reports
+  artifacts: artifacts/triple_barrier
