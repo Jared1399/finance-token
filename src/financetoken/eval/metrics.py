@@ -92,7 +92,9 @@ def reconstruction(df: pd.DataFrame, pq: ProductQuantizer) -> pd.DataFrame:
     out = df.copy()
     token = out["token"].to_numpy()
     dec = pq.decode(token)
-    r_hat = out["atr"].to_numpy() * dec["range_ratio"]
+    # El token de magnitud se normalizo con ATR_{t-1}; el decoder usa ese mismo
+    # valor, no el ATR contemporaneo (que incorpora el rango que se decodifica).
+    r_hat = out["atr_prev"].to_numpy() * dec["range_ratio"]
     prev = out["prev_close"].to_numpy()
 
     lo = prev - dec["o"] * r_hat

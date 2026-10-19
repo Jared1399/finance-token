@@ -48,6 +48,13 @@ python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 ```
 
+Para el transformer con GPU Pascal (GTX 1060 / sm_61) hace falta un wheel
+CUDA 11.8; los builds nuevos de PyTorch ya no incluyen sm_61:
+
+```bash
+.venv/bin/pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu118
+```
+
 ## Uso
 
 Demo end-to-end con datos sintéticos (no requiere red, aislado en `data/demo/`):
@@ -68,6 +75,13 @@ ft sweep             # barrido K_s x K_v -> reports/sweep.md
 ```
 
 `ft all` hace todas las etapas de datos reales de una vez.
+
+Transformer causal (PoC):
+
+```bash
+ft train       # GPT chico sobre tokens; checkpoint en artifacts/transformer
+ft eval-gpt    # one-step + calibracion + closed-loop -> reports/transformer.md
+```
 
 Todo se configura en `configs/tokenizer.yaml`; las rutas son relativas al
 directorio desde donde se ejecuta `ft`.
@@ -130,12 +144,16 @@ Corrida sobre Binance Vision a 15m, ajustando el codebook solo con BTC y ETH
 |---|---|
 | Velas 15m procesadas | 853.703 (564.171 de train) |
 | Codebook | 512 forma × 16 magnitud = 8.195 tokens |
-| Error de forma p50 / p95 | 0.0146 / 0.0253 R |
-| Error de cierre p95 (test) | 0.0658 R ≈ **3.9 bps** |
+| Error de forma p50 / p95 | 0.0143 / 0.0252 R |
+| Error de cierre p95 (test) | 0.0708 R ≈ **4.3 bps** |
 | Códigos muertos | 0 / 512 |
 | Entropía de uso normalizada | 0.993 |
-| Cobertura en holdout (SOL) | 512 / 512 códigos, close p95 4.7 bps |
+| Cobertura en holdout (SOL) | 512 / 512 códigos, close p95 5.2 bps |
 | Gap de apertura p99 (test) | 1.35 bps |
+
+El error de cierre usa `ATR_{t-1}`. Con el ATR contemporáneo (oráculo) daba 3.9
+bps, pero ese valor no es decodificable en generación porque el ATR incluye el
+rango de la vela que se quiere predecir.
 
 Los patrones canónicos caen en centroides distintos y cercanos: Marubozu alcista
 y bajista en IDs 119 y 160 (los dos tokens más frecuentes), Doji en 18, Hammer en
@@ -146,6 +164,60 @@ y bajista en IDs 119 y 160 (los dos tokens más frecuentes), Doji en 18, Hammer 
 error ~30%, pero el costo en parámetros y en frecuencia por token crece. Bajo un
 presupuesto de 10.240 tokens, 512×16 minimiza `p95_forma + p95_cierre`.
 
+## Transformer (PoC)
+
+El decoder es un GPT causal con entrada híbrida:
+
+```
+E_t = Emb_token(Token_t) + Emb_state(State_t) + Linear(scale_t) + Emb_gap(bar_gap_t) + PE(t)
+```
+
+- `Emb_token` es **factorizada**: `Emb_shape(s) + Emb_magnitude(v)`.
+- La cabeza también es factorizada: `kind` (PAD/BOS/FLAT/MORPH) + `shape` (512) +
+  `magnitude` (16). La probabilidad conjunta es
+  `P(kind) · P(shape) · P(magnitude)`; la cabeza pasa de 8195·d a 532·d. Con
+  ~445k tokens de train, una softmax completa de 8195 clases está
+  subentrenada (~54 ejemplos por clase).
+- Se predicen 256 velas de contexto. El objetivo es el token siguiente; la
+  pérdida es la NLL de la distribución factorizada.
+- En `ft eval-gpt` se reportan CE/perplejidad contra unigrama y bigrama
+  interpolado, calibración de dirección/magnitud, y generación closed-loop
+  comparada contra los mismos baselines usando el mismo decoder.
+
+La normalización de magnitud usa **`ATR_{t-1}`**, no `ATR_t`. Con `ATR_t` el
+decoder necesitaría resolver un punto fijo (`R_t` aparece en el `TR_t` que
+define `ATR_t`), y el token normalizaría por su propio rango. El fix hace que el
+token sea decodificable con información ya conocida y que el target sea más
+estable. El costo es un error de cierre honesto de ~4.3 bps en vez de los 3.9
+bps que reportaba el decoder con ATR oráculo.
+
+### Resultados del PoC
+
+Corrida real: BTC/ETH train (2017-2023), val 2024, test 2025-2026; SOL holdout.
+Modelo de 997k parámetros (`d_model=128`, 4 capas, 4 heads, contexto 256).
+
+| Métrica | Valor |
+|---|---|
+| Test CE (nats/token) | 8.6199 |
+| Unigram | 8.6570 |
+| SOL holdout CE | 8.6008 |
+| Bigram | se apaga a λ=0; no hay estructura de orden 1 |
+| Dirección: Brier | 0.2500 (tasa base 0.2500) |
+| Dirección: ECE | 0.0072 |
+| Magnitud `>0.5 R/ATR`: Brier | 0.2356 vs 0.2384 unigram |
+| Closed-loop ACF1 | 0.349 modelo / 0.241 real / 0.440 unigram |
+| Closed-loop ACF5 | 0.286 modelo / 0.140 real |
+| Closed-loop Hill | 4.18 modelo / 3.06 real / 3.04 unigram |
+| Closed-loop kurtosis | 10.7 modelo / 14.3 real / 41.6 unigram |
+
+Lectura: el transformer aprende algo de dinámica (mejor que los baselines en ACF
+de corto plazo y Hurst), pero **el cuello de botella son los datos**: empieza a
+overfitear en la epoch 3, la mejora sobre el unigram es 0.43%, no hay skill
+direccional y subrepresenta las colas. El unigram preserva mejor la cola (Hill
+3.04) pero dispara la kurtosis (41.6). El siguiente paso no es una arquitectura
+más grande: es ampliar el universo de símbolos y probar decodificación/loss
+tail-aware. Detalle completo en `reports/transformer.md`.
+
 ## Tests
 
 ```bash
@@ -155,5 +227,6 @@ presupuesto de 10.240 tokens, 512×16 minimiza `p95_forma + p95_cierre`.
 Incluye: invariantes OHLC, agregación 1m→15m y `bar_gap`, ATR de Wilder contra
 cálculo manual, test explícito de no-lookahead, invariancia a escala,
 consistencia del símplex, round-trip del codebook, utilidades de asignación
-vectorizada, y un end-to-end con datos sintéticos que verifica reconstrucción y
-reporte.
+vectorizada, un end-to-end con datos sintéticos que verifica reconstrucción y
+reporte, y tests del transformer (distribución factorizada suma 1, ventanas que
+no cruzan símbolos/huecos, decoder closed-loop, baselines).

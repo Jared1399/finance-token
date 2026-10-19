@@ -30,6 +30,7 @@ FEATURE_COLUMNS = [
     "trades",
     "bar_gap",
     "atr",
+    "atr_prev",
     "atr_long",
     "range",
     "flat",
@@ -270,10 +271,25 @@ def encode(cfg: Config) -> dict:
             df["flat"].to_numpy(),
         )
         out = df[
-            ["open", "high", "low", "close", "volume", "atr", "atr_long", "bar_gap", "split", "state_bin", "scale"]
+            [
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "atr",
+                "atr_prev",
+                "atr_long",
+                "bar_gap",
+                "split",
+                "state_bin",
+                "scale",
+            ]
         ].copy()
         out["prev_close"] = out["close"].shift(1)
-        out["range_ratio_true"] = np.where(out["atr"] > 0, (out["high"] - out["low"]) / out["atr"], np.nan)
+        out["range_ratio_true"] = np.where(
+            out["atr_prev"] > 0, (out["high"] - out["low"]) / out["atr_prev"], np.nan
+        )
         out["token"] = enc["token"]
         out["shape_id"] = enc["shape_id"]
         out["mag_id"] = enc["mag_id"]

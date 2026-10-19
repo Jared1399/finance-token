@@ -28,6 +28,14 @@ def compute_candle_features(
     out = df.copy()
     atr = atr_wilder(df, atr_k)
     out["atr"] = atr
+    # Denominador del token de magnitud: ATR de la vela ANTERIOR.
+    #
+    # Si se usa ATR_t, que incorpora el TR_t de la vela que se quiere
+    # decodificar, el decoder necesita resolver un punto fijo
+    # (R_t = ratio * ATR_t(R_t)). Ademas, el token normalizaria por su propio
+    # rango y la senal de sorpresa de volatilidad quedaria comprimida.
+    # Con ATR_{t-1} el token es decodificable con informacion ya conocida.
+    out["atr_prev"] = atr.shift(1)
 
     high = df["high"].to_numpy(dtype=np.float64)
     low = df["low"].to_numpy(dtype=np.float64)
@@ -37,7 +45,7 @@ def compute_candle_features(
     rng = high - low
     flat = rng <= flat_epsilon
     safe = np.where(flat, np.nan, rng)
-    atr_v = atr.to_numpy()
+    atr_v = out["atr_prev"].to_numpy()
 
     out["range"] = rng
     out["flat"] = flat

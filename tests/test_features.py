@@ -40,6 +40,19 @@ def test_shape_components_are_bounded_and_consistent():
     np.testing.assert_allclose(total, 1.0, atol=1e-9)
 
 
+def test_range_rel_uses_previous_atr():
+    """El token de magnitud debe ser decodificable con informacion pasada."""
+    from financetoken.features.indicators import atr_wilder
+
+    df = _random_bars(200)
+    out = compute_candle_features(df, atr_k=14, flat_epsilon=0.0)
+    atr = atr_wilder(df, 14)
+    t = 100
+    expected = np.log((df["high"].iloc[t] - df["low"].iloc[t]) / atr.iloc[t - 1])
+    assert np.isclose(out["range_rel"].iloc[t], expected)
+    assert np.isclose(out["atr_prev"].iloc[t], atr.iloc[t - 1])
+
+
 def test_flat_candle_has_no_shape():
     df = _random_bars(50)
     price = float(df.iloc[10]["open"])

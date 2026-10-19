@@ -1,0 +1,38 @@
+tokenizer_config: configs/tokenizer.yaml
+
+model:
+  d_model: 128
+  n_layer: 4
+  n_head: 4
+  dropout: 0.1
+  # 256 velas de 15m ~ 2.7 dias. Con 6 GB de VRAM priorizamos ventanas
+  # independientes antes que contexto semanal.
+  seq_len: 256
+
+train:
+  batch_size: 32
+  lr: 3.0e-4
+  weight_decay: 0.1
+  epochs: 40
+  warmup_frac: 0.05
+  grad_clip: 1.0
+  seed: 42
+  # Solapamiento solo en train. val/test usan stride = seq_len.
+  stride_train: 128
+  patience: 8
+  # Augmentation contra exposure bias del State/Scale en closed-loop.
+  state_noise_prob: 0.01
+  scale_noise: 0.05
+
+eval:
+  batch_size: 32
+  gen_bars: 2000
+  gen_samples: 4
+  temperature: 1.0
+  top_p: 0.95
+  prompt_len: 256
+  seed: 7
+
+paths:
+  artifacts: artifacts/transformer
+  reports: reports

@@ -12,6 +12,9 @@ from .data.binance import download
 from .data.synth import synthesize
 from .eval.report import build_report
 from .eval.sweep import run_sweep
+from .model.config import load_transformer_config
+from .model.evaluate import evaluate_transformer
+from .model.train import train_transformer
 from .pipeline import encode, fit_tokenizer, prepare
 
 
@@ -65,6 +68,14 @@ def cmd_sweep(args) -> None:
     ks = tuple(int(x) for x in args.ks.split(",") if x.strip())
     kvs = tuple(int(x) for x in args.kvs.split(",") if x.strip())
     run_sweep(cfg, ks=ks, kvs=kvs, budget=args.budget)
+
+
+def cmd_train(args) -> None:
+    train_transformer(load_transformer_config(args.config))
+
+
+def cmd_eval_gpt(args) -> None:
+    evaluate_transformer(load_transformer_config(args.config))
 
 
 def cmd_all(args) -> None:
@@ -145,6 +156,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("all", parents=[common], help="download + prepare + fit + encode + report")
     p.add_argument("--workers", type=int, default=8)
     p.set_defaults(func=cmd_all)
+
+    p = sub.add_parser("train", parents=[common], help="entrena el GPT causal sobre tokens")
+    p.set_defaults(func=cmd_train, config="configs/transformer.yaml")
+
+    p = sub.add_parser("eval-gpt", parents=[common], help="evaluacion one-step, calibracion y closed-loop")
+    p.set_defaults(func=cmd_eval_gpt, config="configs/transformer.yaml")
 
     p = sub.add_parser("demo", parents=[common], help="pipeline completo con datos sinteticos")
     p.add_argument("--years", type=float, default=3.0)
