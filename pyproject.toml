@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finance-token"
+version = "0.1.0"
+description = "Morphology tokenizer for financial candlesticks (product quantization over shape and relative range)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scikit-learn>=1.4",
+    "pyarrow>=14",
+    "matplotlib>=3.8",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+torch = ["torch>=2.2"]
+
+[project.scripts]
+ft = "financetoken.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

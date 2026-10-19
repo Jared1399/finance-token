@@ -1,0 +1,55 @@
+# Tokenizador morfologico de velas: product quantization (forma x magnitud).
+# Todas las rutas son relativas al directorio desde donde se ejecuta `ft`.
+
+data:
+  source: binance_vision
+  symbols: [BTCUSDT, ETHUSDT, SOLUSDT]
+  # El codebook se ajusta SOLO con estos simbolos; el resto es held-out.
+  fit_symbols: [BTCUSDT, ETHUSDT]
+  holdout_symbols: [SOLUSDT]
+  timeframe: 15m
+  start: 2017-01-01
+  end: null
+  raw_dir: data/raw
+  processed_dir: data/processed
+
+features:
+  atr_k: 14
+  # 2880 velas de 15m = 30 dias. Mediana movil del ATR para el canal de escala.
+  atr_long_window: 2880
+  # Percentiles de train usados para acotar ln(R/ATR) antes de estandarizar.
+  range_clip_pct: [0.1, 99.9]
+  # [FLAT] solo si R == 0 exacto (las casi-planas caen en el bucket de vol mas bajo).
+  flat_epsilon: 0.0
+
+state:
+  sma_m: 100
+  bins: 256
+  include_scale: true
+
+codebook:
+  scheme: product_quantization
+  shape:
+    k: 512
+    algo: minibatch_kmeans
+    batch_size: 16384
+    max_iter: 300
+    n_init: 3
+    prune_dead: true
+    # None = usar todas las velas de train.
+    sample_size: null
+  magnitude:
+    k: 16
+    algo: kmeans
+    n_init: 10
+  seed: 42
+  min_cluster_mass: 1.0e-5
+
+split:
+  train: {start: 2017-01-01, end: 2023-12-31}
+  val:   {start: 2024-01-01, end: 2024-12-31}
+  test:  {start: 2025-01-01, end: null}
+
+paths:
+  artifacts: artifacts
+  reports: reports
