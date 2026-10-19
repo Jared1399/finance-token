@@ -256,6 +256,37 @@ Resultado (detalle en `reports/direction_12h.md`):
   necesita walk-forward por año, per-símbolo, funding y ejecución maker antes
   de justificar GPU.
 
+## Flujo 4h: taker, funding y open interest
+
+```bash
+ft flow-4h   # ingesta/reutiliza flujo, baseline vs flow, calibracion -> reports/flow_4h.md
+```
+
+Reingesta spot 1m con `taker_buy_base` y construye:
+
+- Taker Buy Ratio y CVD a 15m, 1h, 4h y 12h (26 features de flujo en total).
+- Funding Rate 8h desde Binance Vision futures, alineado as-of.
+- Open Interest 5m y taker long/short ratio desde `futures/um/daily/metrics`.
+
+El modelo es HistGradientBoosting, train 2020-2023, val 2024, test 2025-2026;
+se compara **baseline** (precio/State/Scale) contra **flow** (baseline + flujo).
+La calibración se elige por ECE con 5-fold CV en validación (Isotonic vs Platt,
+con margen de estabilidad para Platt). **No se calculó PnL ni Sharpe.**
+
+Resultado:
+
+| Métrica | Baseline | Flow |
+|---|---|---|
+| Rank IC test BTC/ETH 2025-26 | 0.0423 | 0.0406 |
+| Rank IC SOL holdout | 0.0137 | 0.0134 |
+| ECE test BTC/ETH (raw → calibrado) | 0.0432 → 0.0207 | 0.0394 → **0.0144** |
+| ECE SOL (raw → calibrado) | 0.0450 → 0.0273 | 0.0463 → **0.0219** |
+
+El objetivo de **IC 0.08+ no se alcanzó**. El flujo no agregó información
+direccional out-of-sample; en 2026 mejoró y en 2025 empeoró, sin robustez.
+La calibración Platt sí reduce el ECE a la mitad o más, pero no cambia el ranking.
+El candidato 4h de Stage 0 sigue siendo el de precio/State/Scale, no el de flujo.
+
 ## Tests
 
 ```bash

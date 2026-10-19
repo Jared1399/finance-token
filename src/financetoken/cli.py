@@ -11,6 +11,8 @@ from .config import load_config
 from .data.binance import download
 from .data.synth import synthesize
 from .direction.config import load_direction_config
+from .direction.flow_config import load_flow_config
+from .direction.flow_experiment import run_flow_experiment
 from .direction.pipeline import run_direction
 from .eval.report import build_report
 from .eval.sweep import run_sweep
@@ -82,6 +84,10 @@ def cmd_eval_gpt(args) -> None:
 
 def cmd_direction(args) -> None:
     run_direction(load_direction_config(args.config))
+
+
+def cmd_flow(args) -> None:
+    run_flow_experiment(load_flow_config(args.config))
 
 
 def cmd_all(args) -> None:
@@ -171,6 +177,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("direction", parents=[common], help="Stage 0: skill direccional a 1h/4h/12h")
     p.set_defaults(func=cmd_direction, config="configs/direction.yaml")
+
+    p = sub.add_parser("flow-4h", parents=[common], help="4h con flujo: IC, ECE y hit rate por deciles")
+    p.set_defaults(func=cmd_flow, config="configs/flow_4h.yaml")
 
     p = sub.add_parser("demo", parents=[common], help="pipeline completo con datos sinteticos")
     p.add_argument("--years", type=float, default=3.0)

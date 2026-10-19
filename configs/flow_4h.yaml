@@ -1,0 +1,19 @@
+direction_config: configs/direction.yaml
+
+train_start: 2020-01-01
+flow_raw: data/raw_flow
+flow_processed: data/processed/flows
+
+model:
+  learning_rate: 0.03
+  # Se prueban 7 y 15 hojas; se elige por Rank IC en validacion.
+  leaf_nodes: [7, 15]
+  min_samples_leaf: 100
+  l2_regularization: 1.0
+  max_iter: 300
+
+calibration: [isotonic, platt]
+
+paths:
+  reports: reports
+  artifacts: artifacts/flow
