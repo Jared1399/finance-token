@@ -35,8 +35,10 @@ El vocabulario es el producto cartesiano de ambos codebooks:
 0 [PAD] | 1 [BOS] | 2 [FLAT] | 3 + shape_id * K_v + mag_id
 ```
 
-Con `K_s=512` y `K_v=16` el vocabulario es 8195. La embedding puede factorizarse
-como `Emb_forma(shape_id) + Emb_magnitud(mag_id)`, compartiendo estructura entre
+Con `K_s=512` y `K_v=16` el vocabulario es 8195. Ese par se eligió con
+`ft sweep` minimizando `p95_forma + p95_cierre` bajo un presupuesto de 10.240
+tokens. La embedding puede factorizarse como
+`Emb_forma(shape_id) + Emb_magnitud(mag_id)`, compartiendo estructura entre
 formas similares y reduciendo parámetros.
 
 ## Instalación
@@ -48,7 +50,7 @@ python3 -m venv .venv
 
 ## Uso
 
-Demo end-to-end con datos sintéticos (no requiere red):
+Demo end-to-end con datos sintéticos (no requiere red, aislado en `data/demo/`):
 
 ```bash
 ft demo --years 3
@@ -62,9 +64,10 @@ ft prepare           # resample 15m + validación + features causales
 ft fit-tokenizer     # K-Means forma + magnitud, artefacto versionado
 ft encode            # tokens por vela + state + scale
 ft report            # reports/tokenizer.md + figuras
+ft sweep             # barrido K_s x K_v -> reports/sweep.md
 ```
 
-`ft all` hace las cuatro etapas de datos reales de una vez.
+`ft all` hace todas las etapas de datos reales de una vez.
 
 Todo se configura en `configs/tokenizer.yaml`; las rutas son relativas al
 directorio desde donde se ejecuta `ft`.
@@ -93,7 +96,8 @@ src/financetoken/
 ├── eval/
 │   ├── metrics.py         # uso, entropía, silueta, reconstrucción, gap
 │   ├── plots.py
-│   └── report.py          # Markdown + criterios de aceptación
+│   ├── report.py          # Markdown + criterios de aceptación
+│   └── sweep.py           # barrido K_s x K_v
 └── cli.py
 ```
 
@@ -109,13 +113,38 @@ src/financetoken/
   velas, así que la misma vela puede tokenizar distinto en otro contexto. El ATR
   se guarda junto al token para poder decodificar.
 - **El gap de apertura no está modelado.** El decoder ancla en `prev_close`; el
-  reporte mide `|open - prev_close| / R` (p50/p99). Si es material, hace falta
-  un tercer codebook o un feature de gap.
+  reporte mide `|open - prev_close|` en R y en bps (p50/p99). Si es material,
+  hace falta un tercer codebook o un feature de gap.
 - **`scale = ln(ATR / ATR_long)`** se guarda sin tokenizar. Sin este canal (o
   algo equivalente) los tokens no permiten reconstruir volatilidad absoluta ni
   nivel de precio, solo forma relativa.
 - **Sin fuga entre símbolos**: el codebook se ajusta solo con `fit_symbols`;
   `holdout_symbols` se usa para medir transferencia.
+
+## Resultados sobre datos reales
+
+Corrida sobre Binance Vision a 15m, ajustando el codebook solo con BTC y ETH
+(2017-08 → 2023-12) y usando SOL como holdout:
+
+| Métrica | Valor |
+|---|---|
+| Velas 15m procesadas | 853.703 (564.171 de train) |
+| Codebook | 512 forma × 16 magnitud = 8.195 tokens |
+| Error de forma p50 / p95 | 0.0146 / 0.0253 R |
+| Error de cierre p95 (test) | 0.0658 R ≈ **3.9 bps** |
+| Códigos muertos | 0 / 512 |
+| Entropía de uso normalizada | 0.993 |
+| Cobertura en holdout (SOL) | 512 / 512 códigos, close p95 4.7 bps |
+| Gap de apertura p99 (test) | 1.35 bps |
+
+Los patrones canónicos caen en centroides distintos y cercanos: Marubozu alcista
+y bajista en IDs 119 y 160 (los dos tokens más frecuentes), Doji en 18, Hammer en
+456, Shooting Star en 92. El detalle está en `reports/tokenizer.md` y
+`reports/sweep.md`.
+
+`ft sweep` muestra rendimientos decrecientes: duplicar el vocabulario reduce el
+error ~30%, pero el costo en parámetros y en frecuencia por token crece. Bajo un
+presupuesto de 10.240 tokens, 512×16 minimiza `p95_forma + p95_cierre`.
 
 ## Tests
 
@@ -124,6 +153,7 @@ src/financetoken/
 ```
 
 Incluye: invariantes OHLC, agregación 1m→15m y `bar_gap`, ATR de Wilder contra
-cálculo manual, test explícito de no-lookahead, consistencia del símplex,
-round-trip del codebook, y un end-to-end con datos sintéticos que verifica
-reconstrucción y reporte.
+cálculo manual, test explícito de no-lookahead, invariancia a escala,
+consistencia del símplex, round-trip del codebook, utilidades de asignación
+vectorizada, y un end-to-end con datos sintéticos que verifica reconstrucción y
+reporte.

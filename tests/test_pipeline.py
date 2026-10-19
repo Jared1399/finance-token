@@ -55,6 +55,17 @@ def test_end_to_end(config_factory):
     assert (cfg.reports_dir / "figures" / "shape_map.png").exists()
     assert (cfg.reports_dir / "figures" / "reconstruction.png").exists()
 
+    # Ventanas listas para el transformer (sin cruzar simbolos ni huecos).
+    from financetoken.dataset import build_window_index
+
+    windows = build_window_index(
+        {s: load_tokens(cfg, s) for s in cfg.data.symbols}, split="train", seq_len=64
+    )
+    assert len(windows) > 0
+    x, y = windows.input_target(0)
+    assert len(x) == 63 and len(y) == 63
+    assert (x >= 0).all()
+
 
 def test_splits_have_embargo(config_factory):
     cfg = config_factory()

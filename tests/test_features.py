@@ -60,6 +60,19 @@ def test_features_are_causal():
     pd.testing.assert_frame_equal(base.iloc[:400][cols], alt.iloc[:400][cols])
 
 
+def test_features_are_scale_invariant():
+    """La misma morfologia a 10 USD y a 100.000 USD debe dar el mismo token."""
+    df = _random_bars(400)
+    base = _features(df)
+    scaled = df.copy()
+    scaled[["open", "high", "low", "close"]] *= 137.0
+    alt = _features(scaled)
+    for col in ("o_norm", "c_norm", "range_rel", "wick_up", "wick_low", "z", "scale"):
+        np.testing.assert_allclose(
+            base[col].to_numpy(), alt[col].to_numpy(), rtol=1e-9, atol=1e-12, equal_nan=True
+        )
+
+
 def test_range_scaler_clips_and_standardizes():
     rng = np.random.default_rng(1)
     v = rng.normal(0, 1, 10_000)

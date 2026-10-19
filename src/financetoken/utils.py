@@ -33,11 +33,14 @@ def chunked_min_dist(points: np.ndarray, centroids: np.ndarray, chunk: int = 50_
     centroids = np.ascontiguousarray(centroids, dtype=np.float32)
     if points.ndim == 1:
         points = points[:, None]
+    if centroids.ndim == 1:
+        centroids = centroids[:, None]
+    p_sq = (points**2).sum(axis=1)
     c_sq = (centroids**2).sum(axis=1)
     out = np.empty(len(points), dtype=np.float32)
     for start in range(0, len(points), chunk):
         stop = min(start + chunk, len(points))
-        d = c_sq[None, :] - 2.0 * points[start:stop] @ centroids.T
+        d = p_sq[start:stop, None] + c_sq[None, :] - 2.0 * points[start:stop] @ centroids.T
         out[start:stop] = np.sqrt(np.maximum(d.min(axis=1), 0.0))
     return out
 
@@ -48,10 +51,3 @@ def entropy(counts: np.ndarray) -> float:
         return 0.0
     p = counts[counts > 0] / total
     return float(-(p * np.log(p)).sum())
-
-
-def rand_index_sample(n: int, k: int, seed: int) -> np.ndarray:
-    rng = np.random.default_rng(seed)
-    if n <= k:
-        return np.arange(n)
-    return rng.choice(n, size=k, replace=False)

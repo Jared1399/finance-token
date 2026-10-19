@@ -11,32 +11,9 @@ import pandas as pd
 
 from ..config import Config
 from ..pipeline import load_feature_artifact, load_tokens, load_tokenizer
-from ..tokenizer import vocab
 from . import metrics, plots
-
-
-def _fmt(v) -> str:
-    if isinstance(v, (bool, np.bool_)):
-        return "si" if v else "no"
-    if isinstance(v, (int, np.integer)):
-        return f"{int(v):,}"
-    if isinstance(v, (float, np.floating)):
-        if not np.isfinite(v):
-            return "—"
-        if v != 0 and abs(v) < 1e-3:
-            return f"{v:.2e}"
-        return f"{v:.4f}"
-    return str(v)
-
-
-def md_table(rows: list[dict], cols: list[str] | None = None) -> str:
-    if not rows:
-        return "_sin datos_\n"
-    cols = cols or list(rows[0].keys())
-    lines = ["| " + " | ".join(cols) + " |", "|" + "|".join(["---"] * len(cols)) + "|"]
-    for r in rows:
-        lines.append("| " + " | ".join(_fmt(r.get(c, "")) for c in cols) + " |")
-    return "\n".join(lines) + "\n"
+from .tables import fmt as _fmt
+from .tables import md_table
 
 
 def _pass(cond: bool) -> str:
@@ -94,7 +71,9 @@ def build_report(cfg: Config) -> Path:
                     "mag_p50": ev["mag_rel_err"]["p50"],
                     "mag_p95": ev["mag_rel_err"]["p95"],
                     "close_p95": ev["close_err_r"]["p95"],
+                    "close_p95_bps": ev["close_err_bps"]["p95"],
                     "gap_p99": ev["gap_residual"]["p99"],
+                    "gap_p99_bps": ev["gap_bps"]["p99"],
                     "shape_codes": ev["shape_codes_used"],
                     "recon_invalid": ev["recon_invalid"],
                 }
@@ -132,6 +111,11 @@ def build_report(cfg: Config) -> Path:
             "criterio": "Error de forma p95 < 0.08 R",
             "valor": shape_p95,
             "estado": _pass(shape_p95 < 0.08),
+        },
+        {
+            "criterio": "Error de cierre p95 < 5 bps",
+            "valor": eval_ref.get("close_err_bps", {}).get("p95", np.nan),
+            "estado": _pass(eval_ref.get("close_err_bps", {}).get("p95", np.inf) < 5.0),
         },
         {
             "criterio": "Centroides muertos < 2%",
@@ -195,8 +179,10 @@ def build_report(cfg: Config) -> Path:
                 "mag_p50": ev["mag_rel_err"]["p50"],
                 "mag_p95": ev["mag_rel_err"]["p95"],
                 "close_p95": ev["close_err_r"]["p95"],
+                "close_p95_bps": ev["close_err_bps"]["p95"],
                 "gap_p50": ev["gap_residual"]["p50"],
                 "gap_p99": ev["gap_residual"]["p99"],
+                "gap_p99_bps": ev["gap_bps"]["p99"],
             }
         )
 
@@ -255,7 +241,9 @@ def build_report(cfg: Config) -> Path:
     md.append("## 3. Calidad de reconstruccion\n")
     md.append(
         "Errores en unidades de R (rango de la vela), calculados sobre velas no planas. "
-        "`close_p95` es el error del cierre reconstruido anclando en el cierre previo real.\n"
+        "`close_p95` es el error del cierre reconstruido anclando en el cierre previo real. "
+        "`close_p95_bps` y `gap_p99_bps` estan en puntos base (1 bp = 0.01%): son la "
+        "unidad estable cuando R es apenas un tick.\n"
     )
     md.append(md_table(split_rows))
     md.append(
@@ -294,7 +282,8 @@ def build_report(cfg: Config) -> Path:
     md.append("\n## 9. Limitaciones conocidas\n")
     md.append(
         "- El token no captura el gap de apertura (`open - prev_close`). Se mide en "
-        "`gap_p99`; si es material, hace falta un tercer codebook o un feature de gap.\n"
+        "`gap_p99_bps`; si es material, hace falta un tercer codebook o un feature de gap. "
+        "El p99 en unidades de R se infla en velas de rango minimo y no debe leerse solo.\n"
         "- El token es contextual: depende del ATR de las ultimas k velas, por lo que "
         "la misma vela puede tokenizar distinto en otro contexto. El ATR se guarda en "
         "el dataset para poder decodificar.\n"

@@ -237,6 +237,14 @@ class Config:
         )
 
 
+def _iso(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return pd.Timestamp(value).strftime("%Y-%m-%d")
+
+
 def load_config(path: str | Path, root: str | Path | None = None) -> Config:
     path = Path(path)
     root = Path(root) if root is not None else Path.cwd()
@@ -275,6 +283,13 @@ def load_config(path: str | Path, root: str | Path | None = None) -> Config:
         root=root,
         source_path=path,
     )
+    # PyYAML convierte fechas sin comillas a datetime.date; normalizamos a ISO
+    # para que el fingerprint sea serializable y las comparaciones estables.
+    cfg.data.start = _iso(cfg.data.start) or cfg.data.start
+    cfg.data.end = _iso(cfg.data.end)
+    for _, rng in cfg.split.items():
+        rng.start = _iso(rng.start)
+        rng.end = _iso(rng.end)
     cfg.artifacts_dir.mkdir(parents=True, exist_ok=True)
     cfg.reports_dir.mkdir(parents=True, exist_ok=True)
     return cfg

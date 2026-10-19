@@ -30,6 +30,8 @@ state:
 codebook:
   scheme: product_quantization
   shape:
+    # 512x16 elegido por `ft sweep` (objetivo = forma p95 + cierre p95, con
+    # presupuesto de 10.240 tokens). Ver reports/sweep.md.
     k: 512
     algo: minibatch_kmeans
     batch_size: 16384

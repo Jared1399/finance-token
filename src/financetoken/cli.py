@@ -11,6 +11,7 @@ from .config import load_config
 from .data.binance import download
 from .data.synth import synthesize
 from .eval.report import build_report
+from .eval.sweep import run_sweep
 from .pipeline import encode, fit_tokenizer, prepare
 
 
@@ -59,6 +60,13 @@ def cmd_report(args) -> None:
     build_report(_cfg(args))
 
 
+def cmd_sweep(args) -> None:
+    cfg = _cfg(args)
+    ks = tuple(int(x) for x in args.ks.split(",") if x.strip())
+    kvs = tuple(int(x) for x in args.kvs.split(",") if x.strip())
+    run_sweep(cfg, ks=ks, kvs=kvs, budget=args.budget)
+
+
 def cmd_all(args) -> None:
     cfg = _cfg(args)
     cmd_download(args)
@@ -70,10 +78,24 @@ def cmd_all(args) -> None:
 
 def cmd_demo(args) -> None:
     cfg = _cfg(args)
+    # Aislado del dataset real: correr el demo no debe mezclar velas sinteticas
+    # con las descargadas ni pisar los artefactos de produccion.
+    from dataclasses import replace
+
+    cfg.data = replace(cfg.data, raw_dir="data/demo/raw", processed_dir="data/demo/processed")
+    cfg.artifacts_path = "artifacts/demo"
+    cfg.reports_path = "reports/demo"
     print("=" * 72)
     print("DEMO end-to-end con datos sinteticos (mismo formato que Binance 1m)")
+    print(f"Salidas aisladas en {cfg.raw_dir}, {cfg.artifacts_path}, {cfg.reports_path}")
     print("=" * 72)
-    cmd_synth(args)
+    minutes = int(args.years * 365.25 * 24 * 60)
+    print(f"[synth] {len(cfg.data.symbols)} simbolos, {minutes:,} minutos desde {args.start}")
+    t0 = time.time()
+    out = synthesize(cfg.raw_dir, cfg.data.symbols, args.start, minutes, seed=args.seed)
+    for symbol, n in out.items():
+        print(f"  {symbol:10s} {n} archivos mensuales")
+    print(f"[synth] listo ({time.time()-t0:.1f}s)")
     prepare(cfg)
     fit_tokenizer(cfg)
     encode(cfg)
@@ -113,6 +135,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("report", parents=[common], help="genera reporte y figuras")
     p.set_defaults(func=cmd_report)
+
+    p = sub.add_parser("sweep", parents=[common], help="barrido de K_s y K_v")
+    p.add_argument("--ks", default="128,256,512,1024")
+    p.add_argument("--kvs", default="8,16,32,64")
+    p.add_argument("--budget", type=int, default=10240, help="presupuesto de vocabulario")
+    p.set_defaults(func=cmd_sweep)
 
     p = sub.add_parser("all", parents=[common], help="download + prepare + fit + encode + report")
     p.add_argument("--workers", type=int, default=8)

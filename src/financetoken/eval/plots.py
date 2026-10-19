@@ -46,8 +46,16 @@ def plot_shape_map(pq: ProductQuantizer, counts: np.ndarray, path: Path) -> Path
     ax.set_title(f"Codebook de forma K={pq.k_s} sobre el cuadrado unitario\n(tamano ~ uso, color = cuerpo c-o)")
     ax.set_aspect("equal")
     fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.03, label="body")
-    for sid in np.argsort(usage)[::-1][:8]:
-        ax.annotate(str(sid), (o[sid], c[sid]), fontsize=7, color=INK, xytext=(3, 3), textcoords="offset points")
+    for sid in np.argsort(usage)[::-1][:3]:
+        ax.annotate(
+            str(sid),
+            (o[sid], c[sid]),
+            fontsize=7,
+            color=INK,
+            xytext=(5, 5),
+            textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.7),
+        )
     return _finish(fig, path)
 
 
@@ -58,8 +66,12 @@ def plot_gallery(pq: ProductQuantizer, counts: np.ndarray, path: Path, cols: int
     umax = max(usage.max(), 1e-12)
 
     fig, ax = plt.subplots(figsize=(cols * 0.42, rows * 0.55))
-    for i, (o, c) in enumerate(pq.shape_centroids):
-        r, col = divmod(i, cols)
+    # Ordenar por cuerpo (bajista -> alcista) y luego por posicion de la
+    # apertura: la galeria se vuelve legible en vez de seguir el id arbitrario.
+    order = np.lexsort((pq.shape_centroids[:, 0], pq.shape_centroids[:, 1] - pq.shape_centroids[:, 0]))
+    for pos, i in enumerate(order):
+        o, c = pq.shape_centroids[i]
+        r, col = divmod(pos, cols)
         x = float(col)
         y = float(rows - r)
         color = GREEN if c >= o else RED
@@ -81,7 +93,8 @@ def plot_gallery(pq: ProductQuantizer, counts: np.ndarray, path: Path, cols: int
     ax.set_aspect("equal")
     ax.axis("off")
     ax.set_title(
-        f"Codebook de forma (K={pq.k_s}, fila-major). Opacidad ~ uso; verde = alcista, rojo = bajista",
+        f"Codebook de forma (K={pq.k_s}), ordenado por cuerpo: bajista -> alcista. "
+        "Opacidad ~ uso",
         fontsize=10,
     )
     return _finish(fig, path)
@@ -159,6 +172,70 @@ def plot_errors(df: pd.DataFrame, pq: ProductQuantizer, path: Path) -> Path:
     axes[1].axvline(np.nanmedian(rel), color=RED, lw=1, ls="--")
     for ax in axes:
         ax.grid(alpha=0.2)
+    return _finish(fig, path)
+
+
+def plot_sweep(
+    shape_rows: list[dict],
+    mag_rows: list[dict],
+    combos: list[dict],
+    chosen: dict,
+    path: Path,
+    budget: int | None = None,
+) -> Path:
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 3.8))
+
+    ks = np.array([r["k_s"] for r in shape_rows])
+    for metric in ("p50", "p95", "p99"):
+        axes[0].plot(ks, [r[metric] for r in shape_rows], marker="o", ms=3, label=metric)
+    axes[0].set_xscale("log", base=2)
+    axes[0].set_xlabel("K_s")
+    axes[0].set_ylabel("distancia (o,c)")
+    axes[0].set_title("Error de forma")
+    axes[0].grid(alpha=0.25, which="both")
+    ax2 = axes[0].twinx()
+    ax2.plot(ks, [r["H/Hmax"] for r in shape_rows], color="#999999", ls="--", lw=1, label="H/Hmax")
+    ax2.set_ylabel("H/Hmax", color="#777777")
+    ax2.set_ylim(0, 1.05)
+    ax2.legend(fontsize=7, loc="lower left")
+    axes[0].legend(fontsize=7, loc="upper right")
+
+    kv = np.array([r["k_v"] for r in mag_rows])
+    for metric in ("p50", "p95", "p99"):
+        axes[1].plot(kv, [r[metric] for r in mag_rows], marker="o", ms=3, label=metric)
+    axes[1].set_xscale("log", base=2)
+    axes[1].set_xlabel("K_v")
+    axes[1].set_ylabel("|R_hat/R - 1|")
+    axes[1].set_title("Error de magnitud")
+    axes[1].grid(alpha=0.25, which="both")
+    axes[1].legend(fontsize=7)
+
+    vocab = np.array([r["vocab"] for r in combos])
+    err = np.array([r["objetivo"] for r in combos])
+    kss = np.array([r["k_s"] for r in combos])
+    sc = axes[2].scatter(vocab, err, c=np.log2(kss), cmap="viridis", s=26, alpha=0.85, edgecolors="none")
+    axes[2].scatter([chosen["vocab"]], [chosen["objetivo"]], marker="*", s=220, color=RED, zorder=5,
+                    label=f"elegido: {chosen['k_s']}x{chosen['k_v']}")
+    axes[2].set_xscale("log")
+    axes[2].set_xlabel("tamano de vocabulario")
+    axes[2].set_ylabel("forma p95 + cierre p95 (R)")
+    axes[2].set_title("Costo/beneficio del vocabulario")
+    axes[2].grid(alpha=0.25, which="both")
+    if budget is not None:
+        axes[2].axvline(budget, color=INK, ls="--", lw=1)
+        axes[2].annotate(
+            f"presupuesto {budget:,}",
+            xy=(budget, axes[2].get_ylim()[1]),
+            xytext=(-4, -8),
+            textcoords="offset points",
+            ha="right",
+            va="top",
+            fontsize=7,
+            color=INK,
+        )
+    axes[2].legend(fontsize=7)
+    fig.colorbar(sc, ax=axes[2], fraction=0.046, pad=0.03, label="log2 K_s")
+
     return _finish(fig, path)
 
 

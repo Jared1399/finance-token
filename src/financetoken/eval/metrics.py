@@ -132,7 +132,23 @@ def evaluate_symbol(df: pd.DataFrame, pq: ProductQuantizer, seed: int = 42) -> d
     r_true = (rec["high"] - rec["low"]).to_numpy()
     close_err = np.abs(rec["c_hat"] - rec["close"]).to_numpy() / np.where(r_true > 0, r_true, np.nan)
 
+    # Solo velas continuas: si hay un hueco de datos, `prev_close` esta obsoleto
+    # y tanto el gap como el error del cierre dejan de ser comparables.
+    continuous = sub["bar_gap"].to_numpy() == 0
     gap = np.abs(sub["open"].to_numpy() - sub["prev_close"].to_numpy()) / r_true
+    gap = np.where(continuous, gap, np.nan)
+    close_err = np.where(continuous, close_err, np.nan)
+
+    # En bps el gap y el error del cierre no explotan cuando R ~ 1 tick, que es
+    # justo lo que pasa en velas de rango minimo (2017, SOL en consolidacion).
+    gap_bps = (
+        np.abs(sub["open"].to_numpy() - sub["prev_close"].to_numpy())
+        / sub["prev_close"].to_numpy()
+        * 1e4
+    )
+    gap_bps = np.where(continuous, gap_bps, np.nan)
+    close_bps = np.abs(rec["c_hat"] - rec["close"]).to_numpy() / rec["close"].to_numpy() * 1e4
+    close_bps = np.where(continuous, close_bps, np.nan)
     o_hat, h_hat, l_hat, c_hat = (rec[c].to_numpy() for c in ("o_hat", "h_hat", "l_hat", "c_hat"))
     invalids = int(
         (
@@ -147,7 +163,9 @@ def evaluate_symbol(df: pd.DataFrame, pq: ProductQuantizer, seed: int = 42) -> d
         "shape_err": pct_summary(shape_err),
         "mag_rel_err": pct_summary(mag_rel),
         "close_err_r": pct_summary(close_err),
+        "close_err_bps": pct_summary(close_bps),
         "gap_residual": pct_summary(gap),
+        "gap_bps": pct_summary(gap_bps),
         "recon_invalid": invalids,
         "shape_codes_used": int(sub["shape_id"].nunique()),
         "mag_codes_used": int(sub["mag_id"].nunique()),

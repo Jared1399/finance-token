@@ -85,6 +85,7 @@ def _trim(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
 def prepare(cfg: Config) -> dict:
     """1m -> 15m + features, ajustando scaler/quantizer solo en train."""
     t0 = time.time()
+    cfg.artifacts_dir.mkdir(parents=True, exist_ok=True)
     frames: dict[str, pd.DataFrame] = {}
     stats: dict[str, dict] = {}
 
