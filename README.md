@@ -311,6 +311,33 @@ Resultado:
   las rachas extremas no muestran una reversión efectiva. Platt mejora la
   calibración, no el ranking. No justifica GPU.
 
+## Gating de régimen 4h: continuidad vs reversión
+
+```bash
+ft regime-4h   # compresión vs expansión, modelos especializados -> reports/regime_experiment.md
+```
+
+Features: `bb_keltner_ratio` (BB 20,2 / Keltner 20,1.5·ATR14),
+`volatility_regime` (percentil rolling 30d: compresión/normal/expansión),
+`trend_slope_norm` (pendiente OLS 32 velas / precio) y `rvol_streak`
+(volumen medio de la racha / media 96). Se entrenan modelos especializados:
+`model_range` para compresión, `model_trend` para expansión y `model_normal`;
+el baseline usa solo precio/State/Scale. **Sin PnL ni Sharpe.**
+
+Resultado:
+
+- Regímenes ~1/3 cada uno en train, val y test.
+- Rank IC test BTC/ETH: compresión baseline 0.0707, regime_all 0.0691, gated
+  0.0353; expansión 0.0406 / 0.0389 / 0.0460. SOL: compresión 0.0116 / -0.0041
+  / 0.0027; expansión -0.0087 / 0.0039 / -0.0128. El gating no mejora de forma
+  consistente; en compresión BTC/ETH destruye el IC del baseline.
+- Rachas >95% (BTC/ETH): expansión continuación realizada 49.7%, model_hit
+  55.7% (t=1.39); compresión reversión realizada 47.9%, model_hit 47.9%
+  (t=-0.36). SOL: 53.7%/50.0% y 56.7%/53.3%. **Ningún hit rate supera 58% con
+  t>2.**
+- Conclusión: el régimen no agrega una regla explotable; no justifica GPU.
+  Detalle en `reports/regime_experiment.md`.
+
 ## Tests
 
 ```bash

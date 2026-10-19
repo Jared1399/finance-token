@@ -16,6 +16,8 @@ from .direction.exhaustion_experiment import run_exhaustion_experiment
 from .direction.flow_config import load_flow_config
 from .direction.flow_experiment import run_flow_experiment
 from .direction.pipeline import run_direction
+from .direction.regime_config import load_regime_config
+from .direction.regime_experiment import run_regime_experiment
 from .eval.report import build_report
 from .eval.sweep import run_sweep
 from .model.config import load_transformer_config
@@ -94,6 +96,10 @@ def cmd_flow(args) -> None:
 
 def cmd_exhaustion(args) -> None:
     run_exhaustion_experiment(load_exhaustion_config(args.config))
+
+
+def cmd_regime(args) -> None:
+    run_regime_experiment(load_regime_config(args.config))
 
 
 def cmd_all(args) -> None:
@@ -189,6 +195,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("exhaustion-4h", parents=[common], help="4h agotamiento/reversion: IC, ECE, colas y rachas")
     p.set_defaults(func=cmd_exhaustion, config="configs/exhaustion_4h.yaml")
+
+    p = sub.add_parser("regime-4h", parents=[common], help="4h gating por regimen: compresion vs expansion")
+    p.set_defaults(func=cmd_regime, config="configs/regime_4h.yaml")
 
     p = sub.add_parser("demo", parents=[common], help="pipeline completo con datos sinteticos")
     p.add_argument("--years", type=float, default=3.0)
