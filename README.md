@@ -287,6 +287,30 @@ direccional out-of-sample; en 2026 mejoró y en 2025 empeoró, sin robustez.
 La calibración Platt sí reduce el ECE a la mitad o más, pero no cambia el ranking.
 El candidato 4h de Stage 0 sigue siendo el de precio/State/Scale, no el de flujo.
 
+## Agotamiento de momentum / reversión a la media (4h)
+
+```bash
+ft exhaustion-4h   # features de rachas, ER, VWAP, aceleración -> reports/exhaustion_experiment.md
+```
+
+Features nuevas: `streak_len`/`streak_pct` (percentil rolling de rachas),
+`z_return_4/16/32`, `efficiency_ratio_16/32` (Kaufman), distancia a SMA100 y
+VWAP 24h normalizadas por ATR, y `momentum_accel` (cambio del impulso 4h).
+Baseline = features de precio/State/Scale; Exhaustion = baseline + 11 features
+nuevas. Train 2020-2023, val 2024, test 2025-2026, SOL holdout; Platt en
+validación. **Sin PnL ni Sharpe.**
+
+Resultado:
+
+- Rank IC test BTC/ETH: 0.0423 → 0.0449 (+0.0026); SOL 0.0137 → 0.0093 (peor).
+- ECE exhaustion: raw 0.0370 → Platt 0.0189 en test; SOL 0.0480 → 0.0212.
+- Hit rate P9: 56.9% test, 51.5% SOL; los deciles no son monótonos.
+- Rachas >95%: high_up test +2.5 bps, reversión 51.9%, t=0.24; high_down
+  +14.5 bps, reversión 51.9%, t=1.93. En SOL no hay reversión.
+- Conclusión: las features de agotamiento no mejoran el IC de forma robusta y
+  las rachas extremas no muestran una reversión efectiva. Platt mejora la
+  calibración, no el ranking. No justifica GPU.
+
 ## Tests
 
 ```bash

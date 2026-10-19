@@ -11,6 +11,8 @@ from .config import load_config
 from .data.binance import download
 from .data.synth import synthesize
 from .direction.config import load_direction_config
+from .direction.exhaustion_config import load_exhaustion_config
+from .direction.exhaustion_experiment import run_exhaustion_experiment
 from .direction.flow_config import load_flow_config
 from .direction.flow_experiment import run_flow_experiment
 from .direction.pipeline import run_direction
@@ -88,6 +90,10 @@ def cmd_direction(args) -> None:
 
 def cmd_flow(args) -> None:
     run_flow_experiment(load_flow_config(args.config))
+
+
+def cmd_exhaustion(args) -> None:
+    run_exhaustion_experiment(load_exhaustion_config(args.config))
 
 
 def cmd_all(args) -> None:
@@ -180,6 +186,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("flow-4h", parents=[common], help="4h con flujo: IC, ECE y hit rate por deciles")
     p.set_defaults(func=cmd_flow, config="configs/flow_4h.yaml")
+
+    p = sub.add_parser("exhaustion-4h", parents=[common], help="4h agotamiento/reversion: IC, ECE, colas y rachas")
+    p.set_defaults(func=cmd_exhaustion, config="configs/exhaustion_4h.yaml")
 
     p = sub.add_parser("demo", parents=[common], help="pipeline completo con datos sinteticos")
     p.add_argument("--years", type=float, default=3.0)
