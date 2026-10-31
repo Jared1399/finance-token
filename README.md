@@ -4,8 +4,26 @@ Tokenizador de morfología de velas financieras. Convierte cada vela OHLC en un
 token discreto invariante a escala, usando **product quantization** sobre dos
 codebooks aprendidos del mercado: forma y magnitud relativa.
 
-El repo implementa el tokenizador y su evaluación. No incluye (todavía) el
-transformer: la Fase 5 del diseño.
+El repo implementa el tokenizador y su evaluación, un transformer causal de
+PoC, la etapa direccional y la evaluación con barreras triples.
+
+## Resumen de resultados
+
+Medido sobre BTC/ETH/SOL (velas de 15m, 2024–2025), con split temporal
+train/val/test y 10 bps de costo en todos los backtests. El detalle está en las
+secciones siguientes y en `reports/`.
+
+| etapa | resultado |
+|---|---|
+| Tokenizador (8.195 códigos) | ✓ error de forma 1,43 % de R (p95 2,52 %), 0 reconstrucciones inválidas, 7/7 criterios de aceptación |
+| Transformer causal (997k params) | ✗ CE one-step 8,62 nats (12,43 bits), top-1 0,1 % — sin skill |
+| Direccional 1h / 4h / 12h | ✗ AUC 0,534 / 0,530 / 0,505 · Sharpe neto −2,85 / −0,95 / −0,62 |
+| Triples barreras (TP 1,5 / SL 1,0 ATR) | ✗ rank-IC −0,05 · EV de la cola negativa tras costos |
+
+**Lectura:** la tokenización de morfología funciona y es reutilizable; el
+componente predictivo no muestra ventaja explotable bajo estas condiciones. El
+aporte del repo es el pipeline completo, los criterios de aceptación definidos
+antes de mirar el test y el resultado negativo documentado con números.
 
 ## Idea
 
